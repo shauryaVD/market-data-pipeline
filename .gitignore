@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *.pyo
+*.egg-info/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -26,6 +27,7 @@ tmp/
 
 # Keep directory placeholders
 !data/raw/.gitkeep
+!data/raw/sample_market_prices.csv
 !data/processed/.gitkeep
 !logs/.gitkeep
 

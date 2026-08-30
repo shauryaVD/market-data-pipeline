@@ -1,0 +1,11 @@
+# Run the market data pipeline every weekday at 6:00 AM local machine time.
+# Install example:
+#   crontab scripts/cron.example
+#
+# Update PROJECT_DIR before installing if the repo lives somewhere else.
+
+DATABASE_URL=postgresql://market_user:market_password@localhost:5432/market_data
+PIPELINE_CONFIG=configs/pipeline.yml
+PROJECT_DIR=/Users/shauryadahiya/Documents/Agentic OS/Code OS/Personal/Projects/market-data-pipeline
+
+0 6 * * 1-5 cd "$PROJECT_DIR" && .venv/bin/market-data-pipeline run --config "$PIPELINE_CONFIG" >> logs/cron.log 2>&1
