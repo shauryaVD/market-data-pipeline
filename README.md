@@ -2,6 +2,8 @@
 
 Personal batch ETL pipeline for ingesting market price CSVs into PostgreSQL.
 
+Repository: https://github.com/shauryaVD/market-data-pipeline
+
 ## Portfolio Positioning
 
 - Project only. Never list this under Experience.
@@ -29,7 +31,7 @@ Personal batch ETL pipeline for ingesting market price CSVs into PostgreSQL.
 
 ## Current Status
 
-Repository created. ETL implementation has not started yet.
+GitHub repository created and initial scaffold pushed. ETL implementation has not started yet.
 
 ## Next Step
 
