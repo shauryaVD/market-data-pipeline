@@ -4,11 +4,6 @@ Personal batch ETL pipeline for ingesting market price CSVs into PostgreSQL.
 
 Repository: https://github.com/shauryaVD/market-data-pipeline
 
-## Portfolio Positioning
-
-- Project only. Never list this under Experience.
-- Resume title through May: `Production ETL Pipeline - Market Data Ingestion`.
-- Resume title from June onward, including Google: `Market-Data ETL Pipeline`.
 
 ## Target Stack
 
