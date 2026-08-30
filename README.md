@@ -1,45 +1,95 @@
 # Market Data Pipeline
 
-Personal batch ETL pipeline for ingesting market price CSVs into PostgreSQL.
+A production-style batch ETL project for loading market price CSV files into PostgreSQL with validation, idempotent writes, run monitoring, and operational documentation.
 
 Repository: https://github.com/shauryaVD/market-data-pipeline
 
+## Overview
 
-## Target Stack
+This project simulates a common data engineering workflow: market price files arrive as CSVs, the pipeline validates and normalizes the data, then loads clean records into PostgreSQL without creating duplicates on repeat runs.
+
+The goal is not to build a trading platform. The goal is to show reliable batch ingestion mechanics: clear data contracts, configurable sources, defensible validation, database constraints, observability, and a runbook for failures.
+
+## What It Demonstrates
+
+- Python ETL structure with separated config, transform, database, logging, and CLI layers
+- pandas-based validation and transformation
+- timezone conversion from source market time to UTC
+- deduplication by natural key before loading
+- type checks for timestamps, prices, volume, symbols, and currency codes
+- business-rule enforcement for positive prices, non-negative volume, and high/low price envelopes
+- PostgreSQL bulk loading through psycopg2 `COPY`
+- idempotent UPSERT into the final `market_prices` table
+- `pipeline_runs` monitoring table for duration, throughput, rejected rows, duplicate counts, and error rates
+- structured JSON logging for local debugging and operational review
+- rejected-row exports for data-quality triage
+- Docker Compose PostgreSQL setup
+- YAML-driven source configuration
+- cron-compatible batch execution
+- runbook and architecture documentation
+
+## Architecture
+
+```text
+CSV source
+  -> YAML source config
+  -> pandas validation and transformation
+  -> rejected-row export
+  -> psycopg2 COPY into PostgreSQL staging table
+  -> UPSERT into market_prices
+  -> pipeline_runs monitoring update
+  -> retention policy
+```
+
+The natural key is:
+
+```text
+(source_name, symbol, price_ts)
+```
+
+That key is enforced as the primary key in PostgreSQL, which means re-running the same file updates existing rows instead of creating duplicates.
+
+## Tech Stack
 
 - Python
 - pandas
 - psycopg2
 - PostgreSQL
-- Docker
+- Docker Compose
 - YAML
 - cron
-- structured logging
+- pytest
+- Ruff
 
-## Technical Scope
+## Repository Structure
 
-1. Batch ETL over market price CSVs with timezone conversion, deduplication, type validation, and business-rule enforcement.
-2. Idempotent bulk loads using psycopg2 `COPY` plus PostgreSQL UPSERT, targeting 1,000+ rows/sec and zero duplicate risk on re-runs.
-3. `pipeline_runs` monitoring table for duration, throughput, and error rates, with retention policies.
-4. Incident-response framework with structured failure summaries and runbook steps for diagnosis, mitigation, and escalation.
-5. Docker and cron based execution with YAML-driven configuration so new sources and destinations can be added without code changes.
-
-## What Is Implemented
-
-- YAML-driven source configuration in `configs/pipeline.yml`
-- pandas transformation layer for timezone conversion, deduplication, type validation, and business-rule checks
-- PostgreSQL schema with `market_prices`, `pipeline_runs`, indexes, constraints, and retention function
-- psycopg2 `COPY` into a temporary staging table followed by PostgreSQL UPSERT into `market_prices`
-- JSON structured logs to stdout and `logs/pipeline.log`
-- rejected-row exports under `data/processed/rejections/`
-- incident-response runbook in `docs/RUNBOOK.md`
-- Docker Compose PostgreSQL service
-- cron example for weekday batch execution
-- unit tests for config loading, validation, deduplication, timezone conversion, and failure summaries
-
-## Current Status
-
-Pipeline implementation is complete for a local batch ETL MVP. Docker is not installed on the current machine, so the containerized PostgreSQL smoke test has not been run here.
+```text
+.
+|-- configs/
+|   `-- pipeline.yml              # source, timezone, column, and rule config
+|-- data/
+|   `-- raw/
+|       `-- sample_market_prices.csv
+|-- db/
+|   |-- schema.sql                # market_prices, pipeline_runs, indexes, retention
+|   `-- monitoring_queries.sql    # operational SQL examples
+|-- docs/
+|   |-- ARCHITECTURE.md
+|   `-- RUNBOOK.md
+|-- scripts/
+|   |-- benchmark_load.py         # synthetic CSV generator for throughput testing
+|   |-- cron.example
+|   `-- run_pipeline.sh
+|-- src/
+|   `-- market_data_pipeline/
+|       |-- cli.py
+|       |-- config.py
+|       |-- db.py
+|       |-- logging_config.py
+|       |-- pipeline.py
+|       `-- transform.py
+`-- tests/
+```
 
 ## Quick Start
 
@@ -51,36 +101,71 @@ python3 -m venv .venv
 pip install -e ".[dev]"
 ```
 
+Validate the YAML config:
+
+```bash
+market-data-pipeline validate-config --config configs/pipeline.yml
+```
+
 Start PostgreSQL:
 
 ```bash
 docker compose up -d postgres
 ```
 
-Run the pipeline:
+Apply the database schema:
 
 ```bash
 market-data-pipeline init-db --config configs/pipeline.yml
-market-data-pipeline run --config configs/pipeline.yml
 ```
 
-Validate configuration only:
+Run the sample ingestion:
 
 ```bash
-market-data-pipeline validate-config --config configs/pipeline.yml
+market-data-pipeline run --config configs/pipeline.yml
 ```
 
 Run tests:
 
 ```bash
-pytest
+pytest -q
+```
+
+Run lint and formatting checks:
+
+```bash
+ruff check .
+ruff format --check .
+```
+
+## Configuration
+
+Sources are defined in `configs/pipeline.yml`. A source controls:
+
+- input CSV path
+- source and target timezone
+- destination table
+- CSV-to-canonical column mappings
+- required columns
+- business rules
+
+Example source:
+
+```yaml
+sources:
+  - name: "sample_daily_prices"
+    path: "data/raw/sample_market_prices.csv"
+    timezone:
+      source: "America/New_York"
+      target: "UTC"
+    destination_table: "market_prices"
 ```
 
 ## Data Contract
 
 The default sample source expects:
 
-| CSV column | Target column |
+| CSV column | Target field |
 |---|---|
 | `symbol` | `symbol` |
 | `timestamp` | `price_ts` |
@@ -92,17 +177,76 @@ The default sample source expects:
 | `adjusted_close` | `adjusted_close` |
 | `currency` | `currency` |
 
-The natural key is `(source_name, symbol, price_ts)`, which makes re-runs idempotent.
+Rows that fail validation are excluded from the load and written to `data/processed/rejections/` with rejection reasons.
 
-## Operational Notes
+## Observability
 
-- Run metadata lands in `pipeline_runs`.
-- Runtime logs are JSON structured.
-- Failed runs store a structured failure summary with diagnosis, mitigation, and escalation steps.
-- `prune_pipeline_runs(retention_days)` enforces monitoring-table retention.
-- `scripts/cron.example` shows a weekday scheduled batch.
-- `scripts/benchmark_load.py` generates synthetic CSVs for measuring throughput on a machine with PostgreSQL available.
+Every run writes a record to `pipeline_runs`.
 
-## Next Step
+Tracked fields include:
 
-Run a Docker-backed integration smoke test on a machine with Docker installed, then record the measured throughput from `pipeline_runs.throughput_rows_per_sec`.
+- run ID
+- source name
+- input file path
+- status
+- start and finish timestamps
+- duration
+- rows read
+- rows valid
+- rows loaded
+- rows rejected
+- duplicates dropped
+- throughput rows per second
+- error rate
+- structured failure summary
+
+Failed runs include diagnosis, mitigation, and escalation steps in `failure_summary`.
+
+## Idempotent Loading
+
+The loader uses a two-step PostgreSQL pattern:
+
+1. Bulk copy valid rows into a temporary staging table with psycopg2 `COPY`.
+2. Insert into `market_prices` with `ON CONFLICT (source_name, symbol, price_ts) DO UPDATE`.
+
+This makes repeat runs safe. If the same file is loaded again, rows are matched by key and updated instead of duplicated.
+
+## Benchmarking
+
+The repo includes a synthetic data generator:
+
+```bash
+python scripts/benchmark_load.py --rows 100000 --output data/raw/benchmark_market_prices.csv
+```
+
+After pointing `configs/pipeline.yml` at the generated file, run the pipeline and inspect:
+
+```sql
+SELECT run_id, rows_loaded, duration_ms, throughput_rows_per_sec
+FROM pipeline_runs
+ORDER BY started_at DESC
+LIMIT 5;
+```
+
+Throughput should be claimed only after measuring it against a running PostgreSQL instance on the target machine.
+
+## Current Verification
+
+Verified locally:
+
+- unit tests for config loading, CLI config validation, transformation, deduplication, timezone conversion, business rules, and failure summaries
+- Ruff lint and format checks
+- Python compile check
+- CLI config validation
+
+Not yet verified in the current environment:
+
+- Docker-backed PostgreSQL smoke test, because Docker is not installed on this machine
+- measured PostgreSQL throughput benchmark
+
+## Next Improvements
+
+- Add an integration test profile that runs against Docker Compose PostgreSQL
+- Record a measured throughput benchmark in `pipeline_runs`
+- Add multiple source configs for different vendors or market data formats
+- Add a small dashboard query export for recent pipeline health
