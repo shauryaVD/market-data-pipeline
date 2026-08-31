@@ -19,7 +19,7 @@ def main() -> int:
     output.parent.mkdir(parents=True, exist_ok=True)
 
     symbols = ["AAPL", "MSFT", "NVDA", "GOOGL", "TSLA", "AMZN", "META", "JPM", "V", "MA"]
-    start = datetime(2026, 1, 2, 9, 30)  # noqa: DTZ001 - source CSV timestamps are local.
+    start = datetime(2026, 4, 1, 9, 30)  # noqa: DTZ001 - source CSV timestamps are local.
 
     with output.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.writer(handle)
