@@ -9,8 +9,8 @@ This is a personal portfolio project: a batch ETL pipeline that ingests market p
 ## Positioning Rules
 
 - Keep this in Projects, never Experience.
-- Do not inflate implementation status. The local ETL MVP is implemented; Docker-backed throughput still needs to be measured on a machine with Docker/PostgreSQL available.
-- Do not fabricate benchmarks. The target claim is 1,000+ rows/sec only after it is implemented and measured locally.
+- Do not inflate implementation status. The local ETL MVP is implemented and Docker/PostgreSQL throughput is measured in `docs/BENCHMARK.md` on a GitHub Actions runner.
+- Do not fabricate benchmarks. Use the measured median steady-state figure from `docs/BENCHMARK.md`, not best-run throughput.
 - Never commit secrets or `.env` contents.
 - Do not push, publish, or create a remote without Shaurya's explicit approval.
 

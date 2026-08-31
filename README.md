@@ -213,6 +213,8 @@ This makes repeat runs safe. If the same file is loaded again, rows are matched 
 
 ## Benchmarking
 
+Measured benchmark: the 1M-row full-conflict UPSERT re-runs reached a median steady-state throughput of **23,397.3 rows/sec** on the GitHub Actions Docker/PostgreSQL runner. Full methodology and all run IDs are in [`docs/BENCHMARK.md`](docs/BENCHMARK.md).
+
 The repo includes a synthetic data generator:
 
 ```bash
@@ -228,9 +230,7 @@ ORDER BY started_at DESC
 LIMIT 5;
 ```
 
-Throughput should be claimed only after measuring it against a running PostgreSQL instance on the target machine.
-
-Detailed benchmark results are recorded in `docs/BENCHMARK.md` when available.
+Throughput should be re-measured on any target machine before claiming machine-specific performance.
 
 ## Current Verification
 
@@ -241,14 +241,19 @@ Verified locally:
 - Python compile check
 - CLI config validation
 
-Not yet verified in the current environment:
+Verified on GitHub Actions:
+
+- Docker Compose PostgreSQL benchmark with 100k, 500k, and 1M generated CSV datasets
+- three runs per benchmark dataset: one cold insert and two full-conflict UPSERT re-runs
+- benchmark results read back from `pipeline_runs`
+
+Not yet verified on this Mac:
 
 - Docker-backed PostgreSQL smoke test, because Docker is not installed on this machine
-- measured PostgreSQL throughput benchmark
 
 ## Next Improvements
 
 - Add an integration test profile that runs against Docker Compose PostgreSQL
-- Record a measured throughput benchmark in `pipeline_runs`
+- Re-run the benchmark on a local workstation after Docker Desktop is installed
 - Add multiple source configs for different vendors or market data formats
 - Add a small dashboard query export for recent pipeline health
