@@ -1,12 +1,12 @@
 # Benchmark Results
 
-Generated at: `2026-08-31T06:09:35.496826+00:00`
+Generated at: `2026-08-31T06:29:41.160123+00:00`
 
 ## Environment
 
 | Field | Value |
 |---|---|
-| CPU | AMD EPYC 7763 64-Core Processor |
+| CPU | AMD EPYC 9V74 80-Core Processor |
 | Core count | 4 |
 | RAM | 15.61 GiB |
 | OS | Linux-6.17.0-1022-azure-x86_64-with-glibc2.39 |
@@ -31,27 +31,27 @@ Average bytes per row is measured from the generated CSV data bytes, excluding t
 
 | Dataset | Run | Mode | Run ID | Rows read | Rows loaded | Rows rejected | Duplicates dropped | Duration ms | Rows/sec | CSV parse ms | Transform ms | COPY ms | UPSERT ms |
 |---|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 100k | 1 | cold insert | `a83b74f3-d9d1-4592-a799-380c22489d7a` | 100000 | 100000 | 0 | 0 | 4522 | 22114.11 | 80 | 610 | 181 | 2504 |
-| 100k | 2 | full-conflict upsert | `21776cd4-652d-4691-94ad-62ae4cb7bdd7` | 100000 | 100000 | 0 | 0 | 4848 | 20627.06 | 79 | 598 | 182 | 2839 |
-| 100k | 3 | full-conflict upsert | `97e0dd7f-9297-4d29-bc7f-067b2ea99ad9` | 100000 | 100000 | 0 | 0 | 4832 | 20695.36 | 82 | 591 | 185 | 2818 |
-| 500k | 1 | cold insert | `99074089-701f-4e5e-9b39-ac2e3254116b` | 500000 | 500000 | 0 | 0 | 22644 | 22080.9 | 374 | 2934 | 927 | 12846 |
-| 500k | 2 | full-conflict upsert | `0b561ace-d74a-458c-bd54-5ebf2bbdfec7` | 500000 | 500000 | 0 | 0 | 23944 | 20882.06 | 373 | 2927 | 896 | 14144 |
-| 500k | 3 | full-conflict upsert | `1366198b-98c1-48ed-bc1f-24af5e8f23b2` | 500000 | 500000 | 0 | 0 | 24076 | 20767.57 | 369 | 2985 | 902 | 14201 |
-| 1m | 1 | cold insert | `6f3f800a-32bc-4f88-9408-ec92cf55ca51` | 1000000 | 1000000 | 0 | 0 | 47452 | 21073.93 | 738 | 5881 | 1796 | 27736 |
-| 1m | 2 | full-conflict upsert | `b97c9c0f-0d62-48f3-908a-cb3b38d6facc` | 1000000 | 1000000 | 0 | 0 | 42775 | 23378.14 | 725 | 5952 | 1803 | 23324 |
-| 1m | 3 | full-conflict upsert | `ed630a82-f9ac-49dd-ac88-ad900d1b41cf` | 1000000 | 1000000 | 0 | 0 | 42705 | 23416.46 | 714 | 5930 | 1833 | 23143 |
+| 100k | 1 | cold insert | `affeda66-a569-47a2-8256-5ed744493ffe` | 100000 | 100000 | 0 | 0 | 7363 | 13581.42 | 78 | 4557 | 168 | 871 |
+| 100k | 2 | full-conflict upsert | `091f9fd6-f9b2-45d3-990a-1ab881048382` | 100000 | 100000 | 0 | 0 | 6626 | 15092.06 | 78 | 4452 | 168 | 225 |
+| 100k | 3 | full-conflict upsert | `3bc6e76e-c6b7-4a75-969f-18628c169c88` | 100000 | 100000 | 0 | 0 | 6771 | 14768.87 | 78 | 4552 | 169 | 320 |
+| 500k | 1 | cold insert | `6947ae5e-1dca-41cd-a8ad-13711e76bcb3` | 500000 | 500000 | 0 | 0 | 36580 | 13668.67 | 354 | 22477 | 842 | 4664 |
+| 500k | 2 | full-conflict upsert | `3964b761-83da-4db9-9cfc-982722f501c8` | 500000 | 500000 | 0 | 0 | 33452 | 14946.79 | 363 | 22444 | 830 | 1628 |
+| 500k | 3 | full-conflict upsert | `6d252f9e-98cd-48dc-801a-d893ed5a60b4` | 500000 | 500000 | 0 | 0 | 33126 | 15093.88 | 352 | 22254 | 838 | 1565 |
+| 1m | 1 | cold insert | `b19a9a74-7680-4b5f-b72e-e41e6c19aa90` | 1000000 | 1000000 | 0 | 0 | 76651 | 13046.14 | 705 | 44586 | 1675 | 13254 |
+| 1m | 2 | full-conflict upsert | `cc93d290-ac53-4561-a1be-71688d911edb` | 1000000 | 1000000 | 0 | 0 | 68969 | 14499.27 | 701 | 45069 | 1686 | 3508 |
+| 1m | 3 | full-conflict upsert | `c1149195-64f3-43d0-b11d-0dbd861cfcf2` | 1000000 | 1000000 | 0 | 0 | 69108 | 14470.1 | 713 | 45221 | 1680 | 3466 |
 
 ## Summary
 
 | Dataset | Median duration ms | p95 duration ms | Median rows/sec | p95 rows/sec | Median steady-state rows/sec |
 |---|---:|---:|---:|---:|---:|
-| 100k | 4832.0 | 4846.4 | 20695.36 | 21972.235 | 20661.21 |
-| 500k | 23944.0 | 24062.8 | 20882.06 | 21961.016 | 20824.815 |
-| 1m | 42775.0 | 46984.3 | 23378.14 | 23412.628 | 23397.3 |
+| 100k | 6771.0 | 7303.8 | 14768.87 | 15059.741 | 14930.465 |
+| 500k | 33452.0 | 36267.2 | 14946.79 | 15079.1709 | 15020.335 |
+| 1m | 69108.0 | 75896.7 | 14470.1 | 14496.353 | 14484.685 |
 
 ## Dominant Phase
 
-The benchmark was dominated by UPSERT merge time; median phase timings were CSV parse 373.0 ms, transform 2934.0 ms, COPY 902.0 ms, and UPSERT merge 14144.0 ms.
+The benchmark was dominated by transform time; median phase timings were CSV parse 354.0 ms, transform 22444.0 ms, COPY 838.0 ms, and UPSERT merge 1628.0 ms.
 
 ## Reproduction Commands
 

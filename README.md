@@ -1,6 +1,6 @@
-# Market Data Pipeline
-
 [![CI](https://github.com/shauryaVD/market-data-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/shauryaVD/market-data-pipeline/actions/workflows/ci.yml)
+
+# Market Data Pipeline
 
 Fintech-oriented market data ETL pipeline for loading vendor-style price files into PostgreSQL with point-in-time history, idempotent ingestion, source reconciliation, corporate-action adjustment, and run-level observability.
 
@@ -10,7 +10,7 @@ Repository: https://github.com/shauryaVD/market-data-pipeline
 
 This project handles a practical market-data problem: price files can arrive late, get restated, or conflict with what was already loaded. Instead of overwriting history, the pipeline stores both effective time (`price_ts`) and knowledge time (`valid_from`, `valid_to`, `ingested_at`) so a backtest or audit can answer: what did we believe the close was as of date X?
 
-Measured throughput is recorded in [`docs/BENCHMARK.md`](docs/BENCHMARK.md). The benchmark is run through Docker/PostgreSQL and reads results back from `pipeline_runs`; do not claim a new number unless that file is regenerated.
+Measured steady-state throughput is `14484.685` rows/sec on the 1M-row full-conflict UPSERT benchmark. The benchmark is run through Docker/PostgreSQL and reads results back from `pipeline_runs`; see [`docs/BENCHMARK.md`](docs/BENCHMARK.md) for the full run table and environment.
 
 ## Architecture
 
