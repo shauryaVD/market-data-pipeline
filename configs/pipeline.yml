@@ -37,6 +37,12 @@ market_price_business_rules: &market_price_business_rules
   require_non_negative_volume: true
   require_high_low_envelope: true
 
+market_price_trading_calendar: &market_price_trading_calendar
+  enabled: false
+  market_open: "09:30"
+  market_close: "16:00"
+  holidays: []
+
 sources:
   - name: "sample_daily_prices"
     path: "data/raw/sample_market_prices.csv"
@@ -47,6 +53,7 @@ sources:
     columns: *market_price_columns
     required_columns: *market_price_required_columns
     business_rules: *market_price_business_rules
+    trading_calendar: *market_price_trading_calendar
 
   - name: "benchmark_100k"
     path: "data/raw/benchmark_100k.csv"
@@ -57,6 +64,7 @@ sources:
     columns: *market_price_columns
     required_columns: *market_price_required_columns
     business_rules: *market_price_business_rules
+    trading_calendar: *market_price_trading_calendar
 
   - name: "benchmark_500k"
     path: "data/raw/benchmark_500k.csv"
@@ -67,6 +75,7 @@ sources:
     columns: *market_price_columns
     required_columns: *market_price_required_columns
     business_rules: *market_price_business_rules
+    trading_calendar: *market_price_trading_calendar
 
   - name: "benchmark_1m"
     path: "data/raw/benchmark_1m.csv"
@@ -77,3 +86,4 @@ sources:
     columns: *market_price_columns
     required_columns: *market_price_required_columns
     business_rules: *market_price_business_rules
+    trading_calendar: *market_price_trading_calendar

@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from market_data_pipeline.config import PipelineConfig, SourceConfig, load_config
 from market_data_pipeline.db import (
+    ReconciliationError,
     apply_retention_policy,
     apply_schema,
     connect,
@@ -38,6 +39,8 @@ class PipelineRunResult:
     transform_ms: int
     copy_ms: int
     upsert_ms: int
+    reconciliation_status: str
+    reconciliation: dict
     rejection_path: Path | None
 
 
@@ -84,6 +87,8 @@ def run_source(config: PipelineConfig, source: SourceConfig) -> PipelineRunResul
     transform_ms = 0
     copy_ms = 0
     upsert_ms = 0
+    reconciliation_status = "not_run"
+    reconciliation: dict = {}
 
     log_event(
         logger,
@@ -122,6 +127,8 @@ def run_source(config: PipelineConfig, source: SourceConfig) -> PipelineRunResul
         rows_loaded = load_metrics.rows_loaded
         copy_ms = load_metrics.copy_ms
         upsert_ms = load_metrics.upsert_ms
+        reconciliation_status = load_metrics.reconciliation_status
+        reconciliation = load_metrics.reconciliation
         deleted_runs = apply_retention_policy(conn, config.retention.pipeline_runs_days)
 
         duration_ms = int((perf_counter() - start) * 1000)
@@ -140,6 +147,8 @@ def run_source(config: PipelineConfig, source: SourceConfig) -> PipelineRunResul
             transform_ms=transform_ms,
             copy_ms=copy_ms,
             upsert_ms=upsert_ms,
+            reconciliation_status=reconciliation_status,
+            reconciliation=reconciliation,
         )
         log_event(
             logger,
@@ -158,6 +167,8 @@ def run_source(config: PipelineConfig, source: SourceConfig) -> PipelineRunResul
             transform_ms=transform_ms,
             copy_ms=copy_ms,
             upsert_ms=upsert_ms,
+            reconciliation_status=reconciliation_status,
+            reconciliation=reconciliation,
             retention_rows_deleted=deleted_runs,
             rejection_path=str(rejection_path) if rejection_path else None,
         )
@@ -175,10 +186,15 @@ def run_source(config: PipelineConfig, source: SourceConfig) -> PipelineRunResul
             transform_ms=transform_ms,
             copy_ms=copy_ms,
             upsert_ms=upsert_ms,
+            reconciliation_status=reconciliation_status,
+            reconciliation=reconciliation,
             rejection_path=rejection_path,
         )
     except Exception as error:
         duration_ms = int((perf_counter() - start) * 1000)
+        if isinstance(error, ReconciliationError):
+            reconciliation_status = "failed"
+            reconciliation = error.reconciliation
         try:
             mark_run_failed(
                 conn,
@@ -193,6 +209,8 @@ def run_source(config: PipelineConfig, source: SourceConfig) -> PipelineRunResul
                 transform_ms=transform_ms,
                 copy_ms=copy_ms,
                 upsert_ms=upsert_ms,
+                reconciliation_status=reconciliation_status,
+                reconciliation=reconciliation,
                 error=error,
             )
         except Exception:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass, field
+from datetime import time
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +49,14 @@ class BusinessRules:
 
 
 @dataclass(frozen=True)
+class TradingCalendar:
+    enabled: bool = False
+    market_open: time = time(9, 30)
+    market_close: time = time(16, 0)
+    holidays: frozenset[str] = frozenset()
+
+
+@dataclass(frozen=True)
 class SourceConfig:
     name: str
     path: Path
@@ -56,6 +65,7 @@ class SourceConfig:
     columns: dict[str, str] = field(default_factory=dict)
     required_columns: list[str] = field(default_factory=list)
     business_rules: BusinessRules = field(default_factory=BusinessRules)
+    trading_calendar: TradingCalendar = field(default_factory=TradingCalendar)
 
 
 @dataclass(frozen=True)
@@ -121,6 +131,9 @@ def _parse_source(base_dir: Path, raw: Any) -> SourceConfig:
     business_rules_raw = raw.get("business_rules", {})
     if not isinstance(business_rules_raw, dict):
         raise ConfigError("source.business_rules must be a mapping")
+    trading_calendar_raw = raw.get("trading_calendar", {})
+    if not isinstance(trading_calendar_raw, dict):
+        raise ConfigError("source.trading_calendar must be a mapping")
 
     source = SourceConfig(
         name=_require_str(raw, "name"),
@@ -142,9 +155,27 @@ def _parse_source(base_dir: Path, raw: Any) -> SourceConfig:
                 business_rules_raw.get("require_high_low_envelope", True)
             ),
         ),
+        trading_calendar=_parse_trading_calendar(trading_calendar_raw),
     )
     _validate_source(source)
     return source
+
+
+def _parse_trading_calendar(raw: dict[str, Any]) -> TradingCalendar:
+    return TradingCalendar(
+        enabled=bool(raw.get("enabled", False)),
+        market_open=_parse_time(str(raw.get("market_open", "09:30"))),
+        market_close=_parse_time(str(raw.get("market_close", "16:00"))),
+        holidays=frozenset(str(value) for value in raw.get("holidays", [])),
+    )
+
+
+def _parse_time(value: str) -> time:
+    try:
+        hour, minute = value.split(":", 1)
+        return time(int(hour), int(minute))
+    except ValueError as error:
+        raise ConfigError(f"invalid time value {value!r}; expected HH:MM") from error
 
 
 def _validate_source(source: SourceConfig) -> None:

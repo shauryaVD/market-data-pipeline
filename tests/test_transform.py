@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from dataclasses import replace
+from datetime import UTC, datetime, time
+from decimal import Decimal
 
 import pandas as pd
 
-from market_data_pipeline.config import load_config
+from market_data_pipeline.config import TradingCalendar, load_config
 from market_data_pipeline.transform import transform_market_data
 
 
@@ -50,6 +52,7 @@ def test_transform_converts_timezone_and_deduplicates_valid_rows():
     assert row["symbol"] == "AAPL"
     assert row["currency"] == "USD"
     assert row["price_ts"].isoformat() == "2026-03-13T13:30:00+00:00"
+    assert row["close_price"] == Decimal("172.95")
 
 
 def test_transform_rejects_type_and_business_rule_violations():
@@ -112,3 +115,48 @@ def test_transform_rejects_future_timestamp():
     assert result.rows_valid == 0
     assert result.rows_rejected == 1
     assert "future_timestamp" in result.rejected_rows.loc[0, "rejection_reason"]
+
+
+def test_transform_rejects_rows_outside_enabled_trading_calendar():
+    source = replace(
+        _source(),
+        trading_calendar=TradingCalendar(
+            enabled=True,
+            market_open=time(9, 30),
+            market_close=time(16, 0),
+            holidays=frozenset({"2026-04-03"}),
+        ),
+    )
+    raw = pd.DataFrame(
+        [
+            {
+                "symbol": "AAPL",
+                "timestamp": "2026-04-01 08:00:00",
+                "open": "100",
+                "high": "101",
+                "low": "99",
+                "close": "100",
+                "volume": "1000",
+                "adjusted_close": "100",
+                "currency": "USD",
+            },
+            {
+                "symbol": "AAPL",
+                "timestamp": "2026-04-03 10:00:00",
+                "open": "100",
+                "high": "101",
+                "low": "99",
+                "close": "100",
+                "volume": "1000",
+                "adjusted_close": "100",
+                "currency": "USD",
+            },
+        ]
+    )
+
+    result = transform_market_data(raw, source, now=datetime(2026, 4, 4, tzinfo=UTC))
+
+    assert result.rows_valid == 0
+    reasons = " ".join(result.rejected_rows["rejection_reason"].tolist())
+    assert "outside_market_hours" in reasons
+    assert "market_closed_holiday" in reasons

@@ -15,6 +15,8 @@ SELECT
     transform_ms,
     copy_ms,
     upsert_ms,
+    reconciliation_status,
+    reconciliation,
     error_rate,
     error_message
 FROM pipeline_runs
@@ -46,3 +48,13 @@ FROM pipeline_runs
 WHERE status = 'failed'
 ORDER BY started_at DESC
 LIMIT 1;
+
+-- Point-in-time audit query: what did the pipeline believe Apple's close was
+-- for the 2026-04-01 09:30 New York bar as of 2026-04-02?
+SELECT close_price, adjusted_close, valid_from, valid_to, ingested_at
+FROM market_price_as_of(
+    'benchmark_100k',
+    'AAPL',
+    '2026-04-01 13:30:00+00'::timestamptz,
+    '2026-04-02 00:00:00+00'::timestamptz
+);

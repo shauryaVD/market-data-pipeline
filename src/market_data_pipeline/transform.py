@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal, InvalidOperation
 
 import pandas as pd
 
-from market_data_pipeline.config import SourceConfig
+from market_data_pipeline.config import SourceConfig, TradingCalendar
 
 CANONICAL_COLUMNS = [
     "source_name",
@@ -57,6 +58,7 @@ def transform_market_data(
     _parse_timestamps(working, source, now, reasons)
     _parse_numeric_fields(working, reasons)
     _validate_business_rules(working, source, now, reasons)
+    _validate_trading_calendar(working, source.trading_calendar, reasons)
 
     reason_text = ["; ".join(row_reasons) for row_reasons in reasons]
     invalid_mask = pd.Series([bool(row_reasons) for row_reasons in reasons], index=working.index)
@@ -138,16 +140,16 @@ def _parse_timestamps(
     parsed = pd.to_datetime(frame["timestamp"], errors="coerce", format="mixed")
 
     if parsed.dt.tz is None:
-        parsed = parsed.dt.tz_localize(
+        source_ts = parsed.dt.tz_localize(
             source.timezone.source,
             ambiguous="NaT",
             nonexistent="shift_forward",
         )
     else:
-        parsed = parsed.dt.tz_convert(source.timezone.source)
+        source_ts = parsed.dt.tz_convert(source.timezone.source)
 
-    parsed = parsed.dt.tz_convert(source.timezone.target)
-    frame["price_ts"] = parsed
+    frame["_source_ts"] = source_ts
+    frame["price_ts"] = source_ts.dt.tz_convert(source.timezone.target)
 
     invalid_ts = frame["price_ts"].isna()
     for index in frame.index[invalid_ts]:
@@ -162,28 +164,26 @@ def _parse_timestamps(
 
 
 def _parse_numeric_fields(frame: pd.DataFrame, reasons: list[list[str]]) -> None:
-    numeric_columns = ["open", "high", "low", "close", "adjusted_close", "volume"]
-    for column in numeric_columns:
-        frame[column] = pd.to_numeric(frame[column], errors="coerce")
-
     for source_column, target_column in {
         "open": "open_price",
         "high": "high_price",
         "low": "low_price",
         "close": "close_price",
+        "adjusted_close": "adjusted_close",
     }.items():
-        frame[target_column] = frame[source_column]
+        frame[target_column] = frame[source_column].apply(_parse_decimal)
 
     for column in ["open_price", "high_price", "low_price", "close_price", "volume"]:
+        if column == "volume":
+            continue
         invalid_mask = frame[column].isna()
         for index in frame.index[invalid_mask]:
             reasons[int(index)].append(f"invalid_number:{column}")
 
-    volume_integral = frame["volume"].isna() | (frame["volume"] % 1 == 0)
-    for index in frame.index[~volume_integral]:
+    frame["volume"] = frame["volume"].apply(_parse_int)
+    invalid_volume = frame["volume"].isna()
+    for index in frame.index[invalid_volume]:
         reasons[int(index)].append("invalid_integer:volume")
-
-    frame["volume"] = frame["volume"].astype("Int64")
 
 
 def _validate_business_rules(
@@ -207,12 +207,54 @@ def _validate_business_rules(
             reasons[int(index)].append("negative_volume")
 
     if rules.require_high_low_envelope:
-        comparable = (
-            frame[["open_price", "high_price", "low_price", "close_price"]].notna().all(axis=1)
-        )
-        invalid_envelope = comparable & (
-            (frame["high_price"] < frame[["open_price", "low_price", "close_price"]].max(axis=1))
-            | (frame["low_price"] > frame[["open_price", "high_price", "close_price"]].min(axis=1))
-        )
-        for index in frame.index[invalid_envelope]:
-            reasons[int(index)].append("invalid_high_low_envelope")
+        for index, row in frame.iterrows():
+            values = [row["open_price"], row["high_price"], row["low_price"], row["close_price"]]
+            if any(value is None or pd.isna(value) for value in values):
+                continue
+            open_price, high_price, low_price, close_price = values
+            if high_price < max(open_price, low_price, close_price) or low_price > min(
+                open_price, high_price, close_price
+            ):
+                reasons[int(index)].append("invalid_high_low_envelope")
+
+
+def _validate_trading_calendar(
+    frame: pd.DataFrame,
+    calendar: TradingCalendar,
+    reasons: list[list[str]],
+) -> None:
+    if not calendar.enabled:
+        return
+
+    for index, source_ts in frame["_source_ts"].items():
+        if pd.isna(source_ts):
+            continue
+        local_date = source_ts.date().isoformat()
+        local_time = source_ts.time()
+        if source_ts.weekday() >= 5:
+            reasons[int(index)].append("market_closed_weekend")
+        if local_date in calendar.holidays:
+            reasons[int(index)].append("market_closed_holiday")
+        if local_time < calendar.market_open or local_time > calendar.market_close:
+            reasons[int(index)].append("outside_market_hours")
+
+
+def _parse_decimal(value) -> Decimal | None:
+    if pd.isna(value) or str(value).strip() == "":
+        return None
+    try:
+        return Decimal(str(value).strip())
+    except InvalidOperation:
+        return None
+
+
+def _parse_int(value) -> int | None:
+    if pd.isna(value) or str(value).strip() == "":
+        return None
+    try:
+        decimal_value = Decimal(str(value).strip())
+    except InvalidOperation:
+        return None
+    if decimal_value != decimal_value.to_integral_value():
+        return None
+    return int(decimal_value)

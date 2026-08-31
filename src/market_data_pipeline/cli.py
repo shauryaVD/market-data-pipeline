@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from market_data_pipeline.config import load_config
+from market_data_pipeline.db import connect, recompute_adjusted_close
 from market_data_pipeline.pipeline import initialize_database, run_from_config
 
 
@@ -24,6 +25,14 @@ def main(argv: list[str] | None = None) -> int:
     run_parser = subparsers.add_parser("run", help="run one or more configured sources")
     run_parser.add_argument("--config", default="configs/pipeline.yml")
     run_parser.add_argument("--source", help="optional source name from the YAML config")
+
+    actions_parser = subparsers.add_parser(
+        "recompute-adjusted-close",
+        help="recompute adjusted close after corporate actions are loaded",
+    )
+    actions_parser.add_argument("--config", default="configs/pipeline.yml")
+    actions_parser.add_argument("--source", required=True)
+    actions_parser.add_argument("--symbol", required=True)
 
     args = parser.parse_args(argv)
 
@@ -67,6 +76,7 @@ def main(argv: list[str] | None = None) -> int:
                             "transform_ms": result.transform_ms,
                             "copy_ms": result.copy_ms,
                             "upsert_ms": result.upsert_ms,
+                            "reconciliation_status": result.reconciliation_status,
                             "rejection_path": str(result.rejection_path)
                             if result.rejection_path
                             else None,
@@ -75,6 +85,25 @@ def main(argv: list[str] | None = None) -> int:
                     ],
                 },
                 indent=2,
+            )
+        )
+        return 0
+
+    if args.command == "recompute-adjusted-close":
+        config = load_config(Path(args.config))
+        conn = connect(config.database.dsn)
+        try:
+            rows_updated = recompute_adjusted_close(conn, args.source, args.symbol)
+        finally:
+            conn.close()
+        print(
+            json.dumps(
+                {
+                    "status": "ok",
+                    "source": args.source,
+                    "symbol": args.symbol.upper(),
+                    "rows_updated": rows_updated,
+                }
             )
         )
         return 0

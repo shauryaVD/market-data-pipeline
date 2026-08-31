@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This runbook covers the batch ETL that loads market price CSVs into PostgreSQL.
+This runbook covers the batch ETL that loads market price CSVs into PostgreSQL with point-in-time history and reconciliation.
 
 ## Normal Operation
 
@@ -27,10 +27,10 @@ This runbook covers the batch ETL that loads market price CSVs into PostgreSQL.
    market-data-pipeline init-db --config configs/pipeline.yml
    ```
 
-5. Run the batch:
+5. Run the sample source:
 
    ```bash
-   market-data-pipeline run --config configs/pipeline.yml
+   market-data-pipeline run --config configs/pipeline.yml --source sample_daily_prices
    ```
 
 ## Monitoring
@@ -47,6 +47,7 @@ Each run writes to `pipeline_runs` with:
 - throughput rows per second
 - error rate
 - structured failure summary
+- reconciliation status and per-symbol checksum details
 
 Useful query:
 
@@ -63,10 +64,23 @@ SELECT
     rows_rejected,
     duplicates_dropped,
     throughput_rows_per_sec,
-    error_rate
+    error_rate,
+    reconciliation_status
 FROM pipeline_runs
 ORDER BY started_at DESC
 LIMIT 10;
+```
+
+Point-in-time audit query:
+
+```sql
+SELECT close_price, adjusted_close, valid_from, valid_to, ingested_at
+FROM market_price_as_of(
+    'sample_daily_prices',
+    'AAPL',
+    '2026-03-13 13:30:00+00'::timestamptz,
+    '2026-03-14 00:00:00+00'::timestamptz
+);
 ```
 
 ## Incident Response
@@ -85,7 +99,8 @@ LIMIT 10;
 
 2. Check `logs/pipeline.log` for the matching `run_id`.
 3. Check `data/processed/rejections/` for rejected-row CSVs.
-4. Validate the YAML mapping:
+4. If `reconciliation_status = 'failed'`, inspect `pipeline_runs.reconciliation`.
+5. Validate the YAML mapping:
 
    ```bash
    market-data-pipeline validate-config --config configs/pipeline.yml
@@ -95,7 +110,18 @@ LIMIT 10;
 
 1. If rows are rejected, fix the source CSV or adjust the YAML column mapping.
 2. If the database load fails, compare validation rules in `src/market_data_pipeline/transform.py` with constraints in `db/schema.sql`.
-3. Re-run the same command. The load is idempotent because `market_prices` uses `(source_name, symbol, price_ts)` as the primary key and PostgreSQL UPSERT handles repeats.
+3. If reconciliation failed, compare the per-symbol checksums in `pipeline_runs.reconciliation`.
+4. Re-run the same command. The load is idempotent because only one active version of `(source_name, symbol, price_ts)` can exist at a time.
+
+## Corporate Actions
+
+After loading a split or dividend into `corporate_actions`, recompute adjusted close for the affected source and symbol:
+
+```bash
+market-data-pipeline recompute-adjusted-close --config configs/pipeline.yml --source sample_daily_prices --symbol AAPL
+```
+
+For a stock split, historical rows before the split date are adjusted by the split ratio. Later rows keep their unadjusted close unless another action applies.
 
 ### Escalation
 
