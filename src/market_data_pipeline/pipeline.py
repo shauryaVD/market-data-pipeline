@@ -34,6 +34,10 @@ class PipelineRunResult:
     duplicates_dropped: int
     duration_ms: int
     throughput_rows_per_sec: float
+    csv_parse_ms: int
+    transform_ms: int
+    copy_ms: int
+    upsert_ms: int
     rejection_path: Path | None
 
 
@@ -76,6 +80,10 @@ def run_source(config: PipelineConfig, source: SourceConfig) -> PipelineRunResul
     rows_valid = 0
     rows_rejected = 0
     duplicates_dropped = 0
+    csv_parse_ms = 0
+    transform_ms = 0
+    copy_ms = 0
+    upsert_ms = 0
 
     log_event(
         logger,
@@ -97,15 +105,23 @@ def run_source(config: PipelineConfig, source: SourceConfig) -> PipelineRunResul
             started_at=started_at,
         )
 
+        csv_parse_start = perf_counter()
         raw = read_market_csv(source)
+        csv_parse_ms = int((perf_counter() - csv_parse_start) * 1000)
+
+        transform_start = perf_counter()
         transformed = transform_market_data(raw, source)
+        transform_ms = int((perf_counter() - transform_start) * 1000)
         rows_read = transformed.rows_read
         rows_valid = transformed.rows_valid
         rows_rejected = transformed.rows_rejected
         duplicates_dropped = transformed.duplicates_dropped
 
         rejection_path = write_rejections(config.base_dir, source.name, str(run_id), transformed)
-        rows_loaded = load_market_prices(conn, transformed.valid_rows)
+        load_metrics = load_market_prices(conn, transformed.valid_rows)
+        rows_loaded = load_metrics.rows_loaded
+        copy_ms = load_metrics.copy_ms
+        upsert_ms = load_metrics.upsert_ms
         deleted_runs = apply_retention_policy(conn, config.retention.pipeline_runs_days)
 
         duration_ms = int((perf_counter() - start) * 1000)
@@ -120,6 +136,10 @@ def run_source(config: PipelineConfig, source: SourceConfig) -> PipelineRunResul
             rows_loaded=rows_loaded,
             rows_rejected=rows_rejected,
             duplicates_dropped=duplicates_dropped,
+            csv_parse_ms=csv_parse_ms,
+            transform_ms=transform_ms,
+            copy_ms=copy_ms,
+            upsert_ms=upsert_ms,
         )
         log_event(
             logger,
@@ -134,6 +154,10 @@ def run_source(config: PipelineConfig, source: SourceConfig) -> PipelineRunResul
             rows_rejected=rows_rejected,
             duplicates_dropped=duplicates_dropped,
             throughput_rows_per_sec=throughput,
+            csv_parse_ms=csv_parse_ms,
+            transform_ms=transform_ms,
+            copy_ms=copy_ms,
+            upsert_ms=upsert_ms,
             retention_rows_deleted=deleted_runs,
             rejection_path=str(rejection_path) if rejection_path else None,
         )
@@ -147,6 +171,10 @@ def run_source(config: PipelineConfig, source: SourceConfig) -> PipelineRunResul
             duplicates_dropped=duplicates_dropped,
             duration_ms=duration_ms,
             throughput_rows_per_sec=throughput,
+            csv_parse_ms=csv_parse_ms,
+            transform_ms=transform_ms,
+            copy_ms=copy_ms,
+            upsert_ms=upsert_ms,
             rejection_path=rejection_path,
         )
     except Exception as error:
@@ -161,6 +189,10 @@ def run_source(config: PipelineConfig, source: SourceConfig) -> PipelineRunResul
                 rows_valid=rows_valid,
                 rows_rejected=rows_rejected,
                 duplicates_dropped=duplicates_dropped,
+                csv_parse_ms=csv_parse_ms,
+                transform_ms=transform_ms,
+                copy_ms=copy_ms,
+                upsert_ms=upsert_ms,
                 error=error,
             )
         except Exception:

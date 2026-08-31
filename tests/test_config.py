@@ -14,6 +14,11 @@ def test_load_config_expands_default_database_url(monkeypatch):
     assert config.database.schema_path.name == "schema.sql"
     assert config.sources[0].name == "sample_daily_prices"
     assert config.sources[0].timezone.source == "America/New_York"
+    assert [source.name for source in config.sources[1:]] == [
+        "benchmark_100k",
+        "benchmark_500k",
+        "benchmark_1m",
+    ]
 
 
 def test_load_config_uses_database_url_from_environment(monkeypatch):

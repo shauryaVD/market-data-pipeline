@@ -49,10 +49,20 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
     duplicates_dropped BIGINT NOT NULL DEFAULT 0,
     throughput_rows_per_sec NUMERIC(18, 2) NOT NULL DEFAULT 0,
     error_rate NUMERIC(9, 6) NOT NULL DEFAULT 0,
+    csv_parse_ms BIGINT NOT NULL DEFAULT 0,
+    transform_ms BIGINT NOT NULL DEFAULT 0,
+    copy_ms BIGINT NOT NULL DEFAULT 0,
+    upsert_ms BIGINT NOT NULL DEFAULT 0,
     error_message TEXT,
     failure_summary JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE pipeline_runs
+    ADD COLUMN IF NOT EXISTS csv_parse_ms BIGINT NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS transform_ms BIGINT NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS copy_ms BIGINT NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS upsert_ms BIGINT NOT NULL DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS idx_pipeline_runs_started_at
     ON pipeline_runs (started_at DESC);

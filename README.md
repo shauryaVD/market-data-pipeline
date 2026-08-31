@@ -122,7 +122,7 @@ market-data-pipeline init-db --config configs/pipeline.yml
 Run the sample ingestion:
 
 ```bash
-market-data-pipeline run --config configs/pipeline.yml
+market-data-pipeline run --config configs/pipeline.yml --source sample_daily_prices
 ```
 
 Run tests:
@@ -229,6 +229,8 @@ LIMIT 5;
 ```
 
 Throughput should be claimed only after measuring it against a running PostgreSQL instance on the target machine.
+
+Detailed benchmark results are recorded in `docs/BENCHMARK.md` when available.
 
 ## Current Verification
 

@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import io
 import json
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 from uuid import UUID
 
@@ -27,6 +29,13 @@ COPY_COLUMNS = [
     "adjusted_close",
     "currency",
 ]
+
+
+@dataclass(frozen=True)
+class LoadMetrics:
+    rows_loaded: int
+    copy_ms: int
+    upsert_ms: int
 
 
 def connect(dsn: str):
@@ -79,8 +88,12 @@ def mark_run_completed(
     rows_loaded: int,
     rows_rejected: int,
     duplicates_dropped: int,
+    csv_parse_ms: int,
+    transform_ms: int,
+    copy_ms: int,
+    upsert_ms: int,
 ) -> None:
-    throughput = round(rows_loaded / max(duration_ms / 1000, 0.001), 2)
+    throughput = rows_loaded / max(duration_ms / 1000, 0.001)
     error_rate = round(rows_rejected / rows_read, 6) if rows_read else 0
     with conn.cursor() as cursor:
         cursor.execute(
@@ -96,6 +109,10 @@ def mark_run_completed(
                 duplicates_dropped = %s,
                 throughput_rows_per_sec = %s,
                 error_rate = %s,
+                csv_parse_ms = %s,
+                transform_ms = %s,
+                copy_ms = %s,
+                upsert_ms = %s,
                 error_message = NULL,
                 failure_summary = '{}'::jsonb
             WHERE run_id = %s
@@ -110,6 +127,10 @@ def mark_run_completed(
                 duplicates_dropped,
                 throughput,
                 error_rate,
+                csv_parse_ms,
+                transform_ms,
+                copy_ms,
+                upsert_ms,
                 str(run_id),
             ),
         )
@@ -127,6 +148,10 @@ def mark_run_failed(
     rows_rejected: int,
     duplicates_dropped: int,
     error: BaseException,
+    csv_parse_ms: int = 0,
+    transform_ms: int = 0,
+    copy_ms: int = 0,
+    upsert_ms: int = 0,
 ) -> None:
     failure_summary = build_failure_summary(error)
     error_rate = round(rows_rejected / rows_read, 6) if rows_read else 0
@@ -142,6 +167,10 @@ def mark_run_failed(
                 rows_rejected = %s,
                 duplicates_dropped = %s,
                 error_rate = %s,
+                csv_parse_ms = %s,
+                transform_ms = %s,
+                copy_ms = %s,
+                upsert_ms = %s,
                 error_message = %s,
                 failure_summary = %s::jsonb
             WHERE run_id = %s
@@ -154,6 +183,10 @@ def mark_run_failed(
                 rows_rejected,
                 duplicates_dropped,
                 error_rate,
+                csv_parse_ms,
+                transform_ms,
+                copy_ms,
+                upsert_ms,
                 str(error),
                 json.dumps(failure_summary),
                 str(run_id),
@@ -162,9 +195,9 @@ def mark_run_failed(
     conn.commit()
 
 
-def load_market_prices(conn, rows: pd.DataFrame) -> int:
+def load_market_prices(conn, rows: pd.DataFrame) -> LoadMetrics:
     if rows.empty:
-        return 0
+        return LoadMetrics(rows_loaded=0, copy_ms=0, upsert_ms=0)
 
     temp_table = "staging_market_prices"
     export_rows = rows[COPY_COLUMNS].copy()
@@ -178,6 +211,7 @@ def load_market_prices(conn, rows: pd.DataFrame) -> int:
 
     with conn.cursor() as cursor:
         cursor.execute(f"CREATE TEMP TABLE {temp_table} (LIKE market_prices INCLUDING DEFAULTS)")
+        copy_start = perf_counter()
         cursor.copy_expert(
             f"""
             COPY {temp_table} ({", ".join(COPY_COLUMNS)})
@@ -185,6 +219,8 @@ def load_market_prices(conn, rows: pd.DataFrame) -> int:
             """,
             csv_buffer,
         )
+        copy_ms = int((perf_counter() - copy_start) * 1000)
+        upsert_start = perf_counter()
         cursor.execute(
             f"""
             INSERT INTO market_prices ({", ".join(COPY_COLUMNS)})
@@ -209,8 +245,9 @@ def load_market_prices(conn, rows: pd.DataFrame) -> int:
                 OR market_prices.currency IS DISTINCT FROM EXCLUDED.currency
             """
         )
+        upsert_ms = int((perf_counter() - upsert_start) * 1000)
     conn.commit()
-    return len(rows)
+    return LoadMetrics(rows_loaded=len(rows), copy_ms=copy_ms, upsert_ms=upsert_ms)
 
 
 def apply_retention_policy(conn, retention_days: int) -> int:

@@ -10,6 +10,33 @@ logging:
 retention:
   pipeline_runs_days: 90
 
+market_price_columns: &market_price_columns
+  symbol: "symbol"
+  timestamp: "timestamp"
+  open: "open"
+  high: "high"
+  low: "low"
+  close: "close"
+  volume: "volume"
+  adjusted_close: "adjusted_close"
+  currency: "currency"
+
+market_price_required_columns: &market_price_required_columns
+  - symbol
+  - timestamp
+  - open
+  - high
+  - low
+  - close
+  - volume
+  - currency
+
+market_price_business_rules: &market_price_business_rules
+  allow_future_timestamps: false
+  require_positive_prices: true
+  require_non_negative_volume: true
+  require_high_low_envelope: true
+
 sources:
   - name: "sample_daily_prices"
     path: "data/raw/sample_market_prices.csv"
@@ -17,27 +44,36 @@ sources:
       source: "America/New_York"
       target: "UTC"
     destination_table: "market_prices"
-    columns:
-      symbol: "symbol"
-      timestamp: "timestamp"
-      open: "open"
-      high: "high"
-      low: "low"
-      close: "close"
-      volume: "volume"
-      adjusted_close: "adjusted_close"
-      currency: "currency"
-    required_columns:
-      - symbol
-      - timestamp
-      - open
-      - high
-      - low
-      - close
-      - volume
-      - currency
-    business_rules:
-      allow_future_timestamps: false
-      require_positive_prices: true
-      require_non_negative_volume: true
-      require_high_low_envelope: true
+    columns: *market_price_columns
+    required_columns: *market_price_required_columns
+    business_rules: *market_price_business_rules
+
+  - name: "benchmark_100k"
+    path: "data/raw/benchmark_100k.csv"
+    timezone:
+      source: "America/New_York"
+      target: "UTC"
+    destination_table: "market_prices"
+    columns: *market_price_columns
+    required_columns: *market_price_required_columns
+    business_rules: *market_price_business_rules
+
+  - name: "benchmark_500k"
+    path: "data/raw/benchmark_500k.csv"
+    timezone:
+      source: "America/New_York"
+      target: "UTC"
+    destination_table: "market_prices"
+    columns: *market_price_columns
+    required_columns: *market_price_required_columns
+    business_rules: *market_price_business_rules
+
+  - name: "benchmark_1m"
+    path: "data/raw/benchmark_1m.csv"
+    timezone:
+      source: "America/New_York"
+      target: "UTC"
+    destination_table: "market_prices"
+    columns: *market_price_columns
+    required_columns: *market_price_required_columns
+    business_rules: *market_price_business_rules

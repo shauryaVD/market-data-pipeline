@@ -11,4 +11,9 @@ def test_validate_config_cli_outputs_source_names(capsys):
     output = json.loads(capsys.readouterr().out)
     assert exit_code == 0
     assert output["status"] == "ok"
-    assert output["sources"] == ["sample_daily_prices"]
+    assert output["sources"] == [
+        "sample_daily_prices",
+        "benchmark_100k",
+        "benchmark_500k",
+        "benchmark_1m",
+    ]

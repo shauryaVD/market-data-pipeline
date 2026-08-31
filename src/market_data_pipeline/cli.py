@@ -63,6 +63,10 @@ def main(argv: list[str] | None = None) -> int:
                             "duplicates_dropped": result.duplicates_dropped,
                             "duration_ms": result.duration_ms,
                             "throughput_rows_per_sec": result.throughput_rows_per_sec,
+                            "csv_parse_ms": result.csv_parse_ms,
+                            "transform_ms": result.transform_ms,
+                            "copy_ms": result.copy_ms,
+                            "upsert_ms": result.upsert_ms,
                             "rejection_path": str(result.rejection_path)
                             if result.rejection_path
                             else None,

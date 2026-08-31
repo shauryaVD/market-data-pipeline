@@ -11,6 +11,10 @@ SELECT
     rows_rejected,
     duplicates_dropped,
     throughput_rows_per_sec,
+    csv_parse_ms,
+    transform_ms,
+    copy_ms,
+    upsert_ms,
     error_rate,
     error_message
 FROM pipeline_runs
